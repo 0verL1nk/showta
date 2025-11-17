@@ -1,14 +1,17 @@
 package native
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"overlink.top/app/lib/util"
 	"overlink.top/app/storage"
+	"overlink.top/app/system/conf"
 	"overlink.top/app/system/logic"
 	"overlink.top/app/system/model"
 	"overlink.top/app/system/msg"
@@ -114,4 +117,78 @@ func (self *Native) getApath(rpath string) string {
 	apath := filepath.Join(self.GetRootPath(), subpath)
 	apath = filepath.ToSlash(apath)
 	return apath
+}
+
+// StreamFile streams a file directly to the writer
+func (self *Native) StreamFile(ctx context.Context, rpath string, writer io.Writer) error {
+	apath := self.getApath(rpath)
+
+	// Check if file exists and is not a directory
+	fileInfo, err := os.Stat(apath)
+	if err != nil {
+		return err
+	}
+	if fileInfo.IsDir() {
+		return errors.New("cannot stream a directory")
+	}
+
+	// Open file for reading
+	file, err := os.Open(apath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Use chunked transfer encoding for large files
+	// For HTTP responses, Go automatically handles chunked transfer encoding
+	// when the Content-Length is not set and the connection is HTTP/1.1+
+
+	// Use configured buffer size or default to 64KB
+	bufferSize := 64 * 1024
+	if conf.AppConf.WebDAV.BufferSize > 0 {
+		bufferSize = conf.AppConf.WebDAV.BufferSize
+	}
+	buf := make([]byte, bufferSize)
+	_, err = io.CopyBuffer(writer, file, buf)
+	return err
+}
+
+// StreamRange streams a file range directly to the writer
+func (self *Native) StreamRange(ctx context.Context, rpath string, offset, length int64, writer io.Writer) error {
+	apath := self.getApath(rpath)
+
+	// Check if file exists and is not a directory
+	fileInfo, err := os.Stat(apath)
+	if err != nil {
+		return err
+	}
+	if fileInfo.IsDir() {
+		return errors.New("cannot stream a directory")
+	}
+
+	// Open file for reading
+	file, err := os.Open(apath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Seek to the specified offset
+	_, err = file.Seek(offset, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	// Create a limited reader for the specified length
+	limitedReader := io.LimitReader(file, length)
+
+	// Copy the limited content to writer with buffered copying
+	// Use configured buffer size or default to 64KB
+	bufferSize := 64 * 1024
+	if conf.AppConf.WebDAV.BufferSize > 0 {
+		bufferSize = conf.AppConf.WebDAV.BufferSize
+	}
+	buf := make([]byte, bufferSize)
+	_, err = io.CopyBuffer(writer, limitedReader, buf)
+	return err
 }

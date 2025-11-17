@@ -1,9 +1,11 @@
 package alipan
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/go-resty/resty/v2"
+	"io"
 	"net/http"
 	"path/filepath"
 	"overlink.top/app/lib/apilimit"
@@ -249,4 +251,14 @@ func (self *Alipan) auth() error {
 	logic.SyncUpdateStorage(self, result.AccessToken)
 
 	return nil
+}
+
+// StreamFile streams a file directly to the writer
+func (self *Alipan) StreamFile(ctx context.Context, rpath string, writer io.Writer) error {
+	return storage.DefaultStreamFile(ctx, self, rpath, writer)
+}
+
+// StreamRange streams a file range directly to the writer
+func (self *Alipan) StreamRange(ctx context.Context, rpath string, offset, length int64, writer io.Writer) error {
+	return storage.DefaultStreamRange(ctx, self, rpath, offset, length, writer)
 }

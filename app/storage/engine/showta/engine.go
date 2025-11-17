@@ -1,9 +1,11 @@
 package showta
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/go-resty/resty/v2"
+	"io"
 	"net/http"
 	"path/filepath"
 	"overlink.top/app/storage"
@@ -212,4 +214,14 @@ func (self *Showta) getApath(rpath string) string {
 	apath := filepath.Join(self.GetRootPath(), subpath)
 	apath = filepath.ToSlash(apath)
 	return apath
+}
+
+// StreamFile streams a file directly to the writer
+func (self *Showta) StreamFile(ctx context.Context, rpath string, writer io.Writer) error {
+	return storage.DefaultStreamFile(ctx, self, rpath, writer)
+}
+
+// StreamRange streams a file range directly to the writer
+func (self *Showta) StreamRange(ctx context.Context, rpath string, offset, length int64, writer io.Writer) error {
+	return storage.DefaultStreamRange(ctx, self, rpath, offset, length, writer)
 }

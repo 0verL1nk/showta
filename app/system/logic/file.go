@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"io"
 	"mime"
 	"net/http"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 	"overlink.top/app/system/model"
 	"overlink.top/app/system/msg"
 	"strings"
+	"time"
 )
 
 func ListFile(ctx context.Context, rpath string) (list []msg.Finfo, err error) {
@@ -150,6 +152,44 @@ func ProxyFile(r *http.Request, w http.ResponseWriter, rpath string) {
 		return
 	}
 
+	// Try to use streaming if available
+	if streamer, ok := store.(interface {
+		StreamFile(ctx context.Context, path string, writer io.Writer) error
+	}); ok {
+		// Get file info first
+		info, err := GetFile(r.Context(), rpath)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, "file not found:", err)
+			return
+		}
+
+		if info.IsDir() {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "cannot stream a directory")
+			return
+		}
+
+		// Set attachment headers
+		setAttach(w, &fileInfoAdapter{info})
+
+		// Stream the file directly
+		err = streamer.StreamFile(r.Context(), rpath, w)
+		if err != nil {
+			log.Errorf("streaming file error: %v", err)
+			// Fall back to original method if streaming fails
+			proxyFileOriginal(r, w, rpath, store)
+			return
+		}
+		return
+	}
+	log.Debugf("streaming not supported for storage backend, falling back to original method")
+	// Fall back to original method
+	proxyFileOriginal(r, w, rpath, store)
+}
+
+// proxyFileOriginal is the original implementation for backward compatibility
+func proxyFileOriginal(r *http.Request, w http.ResponseWriter, rpath string, store storage.Storage) {
 	var linkInfo *msg.LinkInfo
 	var err error
 	if store.AllowCache() {
@@ -163,6 +203,12 @@ func ProxyFile(r *http.Request, w http.ResponseWriter, rpath string) {
 		linkInfo, err = cacheFileLink(item, store)
 	} else {
 		linkInfo, err = store.Link(&msg.FileInfo{Path: rpath})
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "link file error:", err)
+		return
 	}
 
 	link := linkInfo.Url
@@ -193,8 +239,51 @@ func ProxyFile(r *http.Request, w http.ResponseWriter, rpath string) {
 	}
 
 	setAttach(w, fi)
-	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
+
+	// Use buffered copy for better memory usage with chunked transfer encoding
+	bufferedCopyWithChunkedEncoding(w, f, fi.Size())
 }
+
+// bufferedCopy copies data from reader to writer using a fixed-size buffer
+// to optimize memory usage for large file transfers
+func bufferedCopy(w io.Writer, r io.Reader) error {
+	// Use configured buffer size or default to 64KB
+	bufferSize := 64 * 1024
+	if conf.AppConf.WebDAV.BufferSize > 0 {
+		bufferSize = conf.AppConf.WebDAV.BufferSize
+	}
+	buf := make([]byte, bufferSize)
+	_, err := io.CopyBuffer(w, r, buf)
+	return err
+}
+
+// bufferedCopyWithChunkedEncoding copies data from reader to writer using a fixed-size buffer
+// and supports chunked transfer encoding for large files
+func bufferedCopyWithChunkedEncoding(w http.ResponseWriter, r io.Reader, fileSize int64) error {
+	// For large files, we rely on Go's automatic chunked transfer encoding
+	// when Content-Length is not explicitly set or when using HTTP/1.1+
+
+	// Use configured buffer size or default to 64KB
+	bufferSize := 64 * 1024
+	if conf.AppConf.WebDAV.BufferSize > 0 {
+		bufferSize = conf.AppConf.WebDAV.BufferSize
+	}
+	buf := make([]byte, bufferSize)
+	_, err := io.CopyBuffer(w, r, buf)
+	return err
+}
+
+// fileInfoAdapter adapts msg.Finfo to os.FileInfo interface
+type fileInfoAdapter struct {
+	info msg.Finfo
+}
+
+func (f *fileInfoAdapter) Name() string       { return f.info.GetName() }
+func (f *fileInfoAdapter) Size() int64        { return f.info.GetSize() }
+func (f *fileInfoAdapter) Mode() os.FileMode  { return 0644 }
+func (f *fileInfoAdapter) ModTime() time.Time { return f.info.ModTime() }
+func (f *fileInfoAdapter) IsDir() bool        { return f.info.IsDir() }
+func (f *fileInfoAdapter) Sys() interface{}   { return nil }
 
 func setAttach(w http.ResponseWriter, fi os.FileInfo) {
 	name := fi.Name()

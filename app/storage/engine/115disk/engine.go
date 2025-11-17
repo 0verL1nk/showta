@@ -1,6 +1,8 @@
 package disk115
 
 import (
+	"context"
+	"io"
 	"overlink.top/app/storage"
 	"overlink.top/app/system/logic"
 	"overlink.top/app/system/model"
@@ -51,4 +53,14 @@ func (self *Disk115) List(info msg.Finfo) (list []msg.Finfo, err error) {
 
 func (self *Disk115) Link(info msg.Finfo) (*msg.LinkInfo, error) {
 	return nil, nil
+}
+
+// StreamFile streams a file directly to the writer
+func (self *Disk115) StreamFile(ctx context.Context, rpath string, writer io.Writer) error {
+	return storage.DefaultStreamFile(ctx, self, rpath, writer)
+}
+
+// StreamRange streams a file range directly to the writer
+func (self *Disk115) StreamRange(ctx context.Context, rpath string, offset, length int64, writer io.Writer) error {
+	return storage.DefaultStreamRange(ctx, self, rpath, offset, length, writer)
 }

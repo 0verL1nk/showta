@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"context"
+	"io"
 	"overlink.top/app/system/model"
 	"overlink.top/app/system/msg"
 )
@@ -23,6 +25,10 @@ type Storage interface {
 	Link(info msg.Finfo) (*msg.LinkInfo, error)
 	AllowCache() bool
 	IsDirect() bool
+
+	// Streaming methods for WebDAV optimization
+	StreamFile(ctx context.Context, path string, writer io.Writer) error
+	StreamRange(ctx context.Context, path string, offset, length int64, writer io.Writer) error
 }
 
 type FormItem struct {

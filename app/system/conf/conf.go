@@ -53,11 +53,18 @@ type Secure struct {
 	SignKey     string `ini:"sign_key"`
 }
 
+type WebDAV struct {
+	CacheSize       int `ini:"cache_size"`
+	MetadataCacheTTL int `ini:"metadata_cache_ttl"`
+	BufferSize      int `ini:"buffer_size"`
+}
+
 type Config struct {
 	Server   `ini:"server"`
 	Database `ini:"database"`
 	Log      `ini:"log"`
 	Secure   `ini:"secure"`
+	WebDAV   `ini:"webdav"`
 }
 
 var (
