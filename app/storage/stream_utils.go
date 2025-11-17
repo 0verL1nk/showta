@@ -39,8 +39,13 @@ func DefaultStreamFile(ctx context.Context, store Storage, rpath string, writer 
 		return errors.New("direct file streaming not implemented in default handler")
 	}
 
-	// For remote files, download and stream
-	resp, err := http.Get(linkInfo.Url)
+	// For remote files, download and stream with context awareness
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, linkInfo.Url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -50,9 +55,7 @@ func DefaultStreamFile(ctx context.Context, store Storage, rpath string, writer 
 		return errors.New("failed to download file")
 	}
 
-	// Copy response body to writer
-	_, err = io.Copy(writer, resp.Body)
-	return err
+	return copyWithContext(ctx, writer, resp.Body)
 }
 
 // DefaultStreamRange provides a default implementation for StreamRange
@@ -87,8 +90,7 @@ func DefaultStreamRange(ctx context.Context, store Storage, rpath string, offset
 	}
 
 	// For remote files, download range and stream
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", linkInfo.Url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, linkInfo.Url, nil)
 	if err != nil {
 		return err
 	}
@@ -97,7 +99,7 @@ func DefaultStreamRange(ctx context.Context, store Storage, rpath string, offset
 	rangeHeader := "bytes=" + fmt.Sprintf("%d-%d", offset, offset+length-1)
 	req.Header.Set("Range", rangeHeader)
 
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -107,7 +109,37 @@ func DefaultStreamRange(ctx context.Context, store Storage, rpath string, offset
 		return errors.New("failed to download file range")
 	}
 
-	// Copy response body to writer
-	_, err = io.Copy(writer, resp.Body)
-	return err
+	return copyWithContext(ctx, writer, resp.Body)
+}
+
+// copyWithContext copies data from reader to writer while monitoring context cancellation
+func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) error {
+	const bufferSize = 64 * 1024 // 64KB buffer
+	buf := make([]byte, bufferSize)
+
+	for {
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+		}
+
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			if _, ew := dst.Write(buf[:nr]); ew != nil {
+				return ew
+			}
+		}
+
+		if er != nil {
+			if errors.Is(er, io.EOF) {
+				break
+			}
+			return er
+		}
+	}
+
+	return nil
 }

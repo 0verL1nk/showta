@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"overlink.top/app/internal/memcache"
 	"overlink.top/app/internal/sign"
 	"overlink.top/app/lib/util"
@@ -19,6 +18,8 @@ import (
 	"overlink.top/app/system/log"
 	"overlink.top/app/system/model"
 	"overlink.top/app/system/msg"
+	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -156,7 +157,6 @@ func ProxyFile(r *http.Request, w http.ResponseWriter, rpath string) {
 	if streamer, ok := store.(interface {
 		StreamFile(ctx context.Context, path string, writer io.Writer) error
 	}); ok {
-		// Get file info first
 		info, err := GetFile(r.Context(), rpath)
 		if err != nil {
 			w.WriteHeader(http.StatusNotFound)
@@ -170,15 +170,51 @@ func ProxyFile(r *http.Request, w http.ResponseWriter, rpath string) {
 			return
 		}
 
-		// Set attachment headers
-		setAttach(w, &fileInfoAdapter{info})
+		fileInfo := &fileInfoAdapter{info}
+		totalSize := info.GetSize()
+		rangeHeader := r.Header.Get("Range")
 
-		// Stream the file directly
+		if rangeHeader != "" {
+			if ranger, ok := store.(interface {
+				StreamRange(ctx context.Context, path string, offset, length int64, writer io.Writer) error
+			}); ok {
+				byteRange, err := parseRangeHeader(rangeHeader, totalSize)
+				if err != nil {
+					w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", totalSize))
+					w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+					return
+				}
+
+				setAttach(w, fileInfo)
+				length := byteRange.Length()
+				w.Header().Set("Accept-Ranges", "bytes")
+				w.Header().Set("Content-Length", strconv.FormatInt(length, 10))
+				w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", byteRange.Start, byteRange.End, totalSize))
+				w.WriteHeader(http.StatusPartialContent)
+
+				err = ranger.StreamRange(r.Context(), rpath, byteRange.Start, length, w)
+				if err != nil {
+					if isClientDisconnectError(err) {
+						log.Debugf("client disconnected during range streaming: %s", rpath)
+					} else {
+						log.Errorf("range streaming file error: %v", err)
+					}
+				}
+				return
+			}
+		}
+
+		// Normal full-file streaming path
+		setAttach(w, fileInfo)
+		w.Header().Set("Accept-Ranges", "bytes")
+
 		err = streamer.StreamFile(r.Context(), rpath, w)
 		if err != nil {
-			log.Errorf("streaming file error: %v", err)
-			// Fall back to original method if streaming fails
-			proxyFileOriginal(r, w, rpath, store)
+			if isClientDisconnectError(err) {
+				log.Debugf("client disconnected during streaming: %s", rpath)
+			} else {
+				log.Errorf("streaming file error: %v", err)
+			}
 			return
 		}
 		return
@@ -447,4 +483,101 @@ func cacheFileLink(info msg.Finfo, store storage.Storage) (linkInfo *msg.LinkInf
 
 	memcache.Expire(memcache.Link, rpath, linkInfo, linkInfo.Expire)
 	return
+}
+
+// isClientDisconnectError checks if an error indicates the client closed the connection
+func isClientDisconnectError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+	patterns := []string{
+		"broken pipe",
+		"connection reset by peer",
+		"wsasend",
+		"forcibly closed",
+		"use of closed network connection",
+		"connection refused",
+		"EOF",
+	}
+
+	for _, pattern := range patterns {
+		if strings.Contains(errStr, pattern) {
+			return true
+		}
+	}
+
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+type byteRange struct {
+	Start int64
+	End   int64
+}
+
+func (br byteRange) Length() int64 {
+	return br.End - br.Start + 1
+}
+
+func parseRangeHeader(header string, size int64) (byteRange, error) {
+	const prefix = "bytes="
+	if !strings.HasPrefix(header, prefix) {
+		return byteRange{}, errors.New("invalid range unit")
+	}
+
+	spec := strings.TrimSpace(header[len(prefix):])
+	if spec == "" {
+		return byteRange{}, errors.New("empty range")
+	}
+
+	if idx := strings.Index(spec, ","); idx >= 0 {
+		spec = spec[:idx]
+	}
+
+	var start, end int64
+	if strings.HasPrefix(spec, "-") {
+		length, err := strconv.ParseInt(strings.TrimPrefix(spec, "-"), 10, 64)
+		if err != nil || length <= 0 {
+			return byteRange{}, errors.New("invalid suffix range")
+		}
+		if length > size {
+			length = size
+		}
+		start = size - length
+		end = size - 1
+	} else if strings.HasSuffix(spec, "-") {
+		value := strings.TrimSuffix(spec, "-")
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || parsed < 0 {
+			return byteRange{}, errors.New("invalid range start")
+		}
+		if parsed >= size {
+			return byteRange{}, errors.New("range start beyond size")
+		}
+		start = parsed
+		end = size - 1
+	} else {
+		parts := strings.Split(spec, "-")
+		if len(parts) != 2 {
+			return byteRange{}, errors.New("invalid range format")
+		}
+		var err error
+		start, err = strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 64)
+		if err != nil || start < 0 {
+			return byteRange{}, errors.New("invalid range start")
+		}
+		end, err = strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
+		if err != nil || end < start {
+			return byteRange{}, errors.New("invalid range end")
+		}
+		if start >= size {
+			return byteRange{}, errors.New("range start beyond size")
+		}
+		if end >= size {
+			end = size - 1
+		}
+	}
+
+	return byteRange{Start: start, End: end}, nil
 }

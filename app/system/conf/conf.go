@@ -130,7 +130,11 @@ func genLocalConf() {
 		JwtSecret:   util.GenRandStr(16),
 		SignKey:     util.GenRandStr(16),
 	}
-
+	AppConf.WebDAV = WebDAV{
+		CacheSize:       1024,
+		MetadataCacheTTL: 60,
+		BufferSize:      512 * 1024,
+	}
 	createIniFile()
 }
 
