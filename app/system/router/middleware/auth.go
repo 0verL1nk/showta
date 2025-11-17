@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"showta.cc/app/internal/jwt"
-	"showta.cc/app/system/model"
-	"showta.cc/app/system/msg"
+	"overlink.top/app/internal/jwt"
+	"overlink.top/app/system/model"
+	"overlink.top/app/system/msg"
 )
 
 const (

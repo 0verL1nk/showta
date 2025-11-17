@@ -2,9 +2,9 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"showta.cc/app/system/conf"
-	"showta.cc/app/system/model"
-	"showta.cc/app/system/msg"
+	"overlink.top/app/system/conf"
+	"overlink.top/app/system/model"
+	"overlink.top/app/system/msg"
 )
 
 func GetMenu(c *gin.Context) {

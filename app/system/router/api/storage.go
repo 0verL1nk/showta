@@ -3,10 +3,10 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	_ "showta.cc/app/storage/engine"
-	"showta.cc/app/system/logic"
-	"showta.cc/app/system/model"
-	"showta.cc/app/system/msg"
+	_ "overlink.top/app/storage/engine"
+	"overlink.top/app/system/logic"
+	"overlink.top/app/system/model"
+	"overlink.top/app/system/msg"
 )
 
 func AddRouterStorage(g *gin.RouterGroup) {

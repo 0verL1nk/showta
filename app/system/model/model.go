@@ -1,24 +1,22 @@
 package model
 
 import (
-	// "fmt"
+	"fmt"
 	"github.com/glebarez/sqlite"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	syslog "log"
 	"os"
 	"path/filepath"
-	"showta.cc/app/lib/util"
-	"showta.cc/app/system/conf"
+	"overlink.top/app/lib/util"
+	"overlink.top/app/system/conf"
 	"time"
 )
 
 var db *gorm.DB
 
 func InitDb(cfg conf.Database) {
-	fullDbName := conf.AbsPath(cfg.Dbname)
-	checkDbDir(fullDbName)
-
 	newLogger := logger.New(
 		syslog.New(os.Stdout, "\r\n", syslog.LstdFlags), // io writer
 		logger.Config{
@@ -31,16 +29,64 @@ func InitDb(cfg conf.Database) {
 	)
 
 	var err error
-	db, err = gorm.Open(sqlite.Open(fullDbName), &gorm.Config{Logger: newLogger})
-	if err != nil {
-		panic("failed to connect database")
+
+	// Determine database type
+	dbType := cfg.Type
+	if dbType == "" {
+		// Auto-detect based on dbname extension
+		if filepath.Ext(cfg.Dbname) == ".db" {
+			dbType = "sqlite"
+		} else {
+			dbType = "sqlite" // default to sqlite for backward compatibility
+		}
 	}
 
-	db.Exec("PRAGMA journal_mode=WAL;")
-	if sqlDB, err := db.DB(); err == nil {
-		sqlDB.SetMaxIdleConns(10)
-		sqlDB.SetMaxOpenConns(100)
-		sqlDB.SetConnMaxLifetime(time.Hour)
+	switch dbType {
+	case "mysql":
+		// Create MySQL connection string
+		dsn := cfg.User + ":" + cfg.Password + "@tcp(" + cfg.Host + ":" + fmt.Sprintf("%d", cfg.Port) + ")/" + cfg.Dbname + "?charset=utf8mb4&parseTime=True&loc=Local"
+
+		// Add TLS options if enabled
+		if cfg.TLS {
+			if cfg.TLSSkipVerify {
+				dsn += "&tls=skip-verify"
+			} else if cfg.TLSCAFile != "" || cfg.TLSCertFile != "" || cfg.TLSKeyFile != "" {
+				// Custom TLS configuration would be needed here
+				dsn += "&tls=true"
+			} else {
+				dsn += "&tls=true"
+			}
+		}
+
+		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{Logger: newLogger})
+		if err != nil {
+			panic("failed to connect to MySQL database: " + err.Error())
+		}
+
+		// Configure MySQL connection pooling
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.SetMaxIdleConns(10)
+			sqlDB.SetMaxOpenConns(100)
+			sqlDB.SetConnMaxLifetime(time.Hour)
+		}
+
+	case "sqlite":
+		fallthrough
+	default:
+		fullDbName := conf.AbsPath(cfg.Dbname)
+		checkDbDir(fullDbName)
+
+		db, err = gorm.Open(sqlite.Open(fullDbName), &gorm.Config{Logger: newLogger})
+		if err != nil {
+			panic("failed to connect to SQLite database: " + err.Error())
+		}
+
+		db.Exec("PRAGMA journal_mode=WAL;")
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.SetMaxIdleConns(10)
+			sqlDB.SetMaxOpenConns(100)
+			sqlDB.SetConnMaxLifetime(time.Hour)
+		}
 	}
 
 	// Migrate the schema

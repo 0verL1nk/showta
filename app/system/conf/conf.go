@@ -5,15 +5,20 @@ import (
 	"gopkg.in/ini.v1"
 	"os"
 	"path/filepath"
-	"showta.cc/app/lib/util"
+	"overlink.top/app/lib/util"
 )
 
 type Server struct {
-	Host       string `ini:"host"`
-	Port       int    `ini:"port"`
-	Https      bool   `ini:"https"`
-	SSLCertPem string `ini:"ssl_cert_pem"`
-	SSLKeyPem  string `ini:"ssl_key_pem"`
+	Host           string   `ini:"host"`
+	Port           int      `ini:"port"`
+	Https          bool     `ini:"https"`
+	SSLCertPem     string   `ini:"ssl_cert_pem"`
+	SSLKeyPem      string   `ini:"ssl_key_pem"`
+	MinTLSVersion  string   `ini:"min_tls_version"`
+	CipherSuites   []string `ini:"cipher_suites"`
+	ClientAuth     string   `ini:"client_auth"`
+	ClientCA       string   `ini:"client_ca"`
+	TrustedProxies []string `ini:"trusted_proxies"`
 }
 
 type Log struct {
@@ -28,11 +33,18 @@ type Log struct {
 }
 
 type Database struct {
+	Type     string `ini:"type"`
 	User     string `ini:"user"`
 	Password string `ini:"password"`
 	Dbname   string `ini:"dbname"`
 	Host     string `ini:"host"`
 	Port     int    `ini:"port"`
+	// TLS options for MySQL
+	TLS      bool   `ini:"tls"`
+	TLSSkipVerify bool `ini:"tls_skip_verify"`
+	TLSCAFile string `ini:"tls_ca_file"`
+	TLSCertFile string `ini:"tls_cert_file"`
+	TLSKeyFile string `ini:"tls_key_file"`
 }
 
 type Secure struct {
@@ -90,6 +102,7 @@ func genLocalConf() {
 		Port:       8888,
 		SSLCertPem: "cert.pem",
 		SSLKeyPem:  "key.pem",
+		TrustedProxies: []string{},
 	}
 
 	AppConf.Log = Log{
@@ -101,6 +114,7 @@ func genLocalConf() {
 	}
 
 	AppConf.Database = Database{
+		Type:   "sqlite",
 		Dbname: "runtime/data/nano.db",
 	}
 

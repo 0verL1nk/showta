@@ -3,8 +3,8 @@ package webdav
 import (
 	"net/http"
 	"path"
-	"showta.cc/app/system/logic"
-	"showta.cc/app/system/msg"
+	"overlink.top/app/system/logic"
+	"overlink.top/app/system/msg"
 )
 
 func (h *Handler) ServeHTTPOverride(w http.ResponseWriter, r *http.Request) {

@@ -4,8 +4,8 @@ import (
 	// "fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"showta.cc/app/system/logic"
-	"showta.cc/app/system/msg"
+	"overlink.top/app/system/logic"
+	"overlink.top/app/system/msg"
 )
 
 func AddRouterPreference(g *gin.RouterGroup) {

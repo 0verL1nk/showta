@@ -1,8 +1,8 @@
 package storage
 
 import (
-	"showta.cc/app/system/model"
-	"showta.cc/app/system/msg"
+	"overlink.top/app/system/model"
+	"overlink.top/app/system/msg"
 )
 
 type Config struct {

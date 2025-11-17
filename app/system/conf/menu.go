@@ -63,7 +63,7 @@ var (
 		},
 		{
 			Name:     "documentation",
-			Path:     "https://www.showta.cc/intro/",
+			Path:     "https://www.overlink.top/intro/",
 			Icon:     "Star",
 			Mtype:    2,
 			Children: []Menu{},

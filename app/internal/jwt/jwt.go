@@ -2,8 +2,8 @@ package jwt
 
 import (
 	"github.com/golang-jwt/jwt/v4"
-	"showta.cc/app/system/conf"
-	"showta.cc/app/system/msg"
+	"overlink.top/app/system/conf"
+	"overlink.top/app/system/msg"
 	"time"
 )
 

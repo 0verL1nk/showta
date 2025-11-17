@@ -3,9 +3,9 @@ package router
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"showta.cc/app/system/log"
-	"showta.cc/app/system/router/api"
-	"showta.cc/app/system/router/middleware"
+	"overlink.top/app/system/log"
+	"overlink.top/app/system/router/api"
+	"overlink.top/app/system/router/middleware"
 )
 
 func InitRouter() *gin.Engine {

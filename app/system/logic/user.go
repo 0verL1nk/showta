@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"os"
-	"showta.cc/app/internal/jwt"
-	"showta.cc/app/lib/util"
-	"showta.cc/app/system/conf"
-	"showta.cc/app/system/log"
-	"showta.cc/app/system/model"
-	"showta.cc/app/system/msg"
+	"overlink.top/app/internal/jwt"
+	"overlink.top/app/lib/util"
+	"overlink.top/app/system/conf"
+	"overlink.top/app/system/log"
+	"overlink.top/app/system/model"
+	"overlink.top/app/system/msg"
 	"time"
 )
 
@@ -69,7 +69,7 @@ func Auth(c *gin.Context, username string, password string) (resp msg.LoginResp,
 		return
 	}
 
-	user.LoginIp = util.ClientIP(c.Request)
+	user.LoginIp = util.ClientIPSimple(c.Request)
 	user.LoginTime = time.Now()
 	model.UpdateUser(user)
 

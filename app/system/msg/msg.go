@@ -3,7 +3,7 @@ package msg
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"showta.cc/app/system/model"
+	"overlink.top/app/system/model"
 	"time"
 )
 

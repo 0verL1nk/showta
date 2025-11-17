@@ -6,13 +6,13 @@ import (
 	"github.com/go-resty/resty/v2"
 	"net/http"
 	"path/filepath"
-	"showta.cc/app/lib/apilimit"
-	"showta.cc/app/lib/util"
-	"showta.cc/app/storage"
-	"showta.cc/app/system/log"
-	"showta.cc/app/system/logic"
-	"showta.cc/app/system/model"
-	"showta.cc/app/system/msg"
+	"overlink.top/app/lib/apilimit"
+	"overlink.top/app/lib/util"
+	"overlink.top/app/storage"
+	"overlink.top/app/system/log"
+	"overlink.top/app/system/logic"
+	"overlink.top/app/system/model"
+	"overlink.top/app/system/msg"
 	"strings"
 	"time"
 )
@@ -31,7 +31,7 @@ func init() {
 	logic.RegisterEngine(func() storage.Storage {
 		return &Alipan{
 			Domain:        "https://openapi.alipan.com",
-			ProxyOauthUrl: "https://api.showta.cc/alipan/access_token",
+			ProxyOauthUrl: "https://api.overlink.top/alipan/access_token",
 		}
 	})
 }

@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
-	"showta.cc/app/system/conf"
+	"overlink.top/app/system/conf"
 	"time"
 )
 

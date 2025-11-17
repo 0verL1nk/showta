@@ -3,8 +3,8 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"showta.cc/app/internal/webdav"
-	"showta.cc/app/system/logic"
+	"overlink.top/app/internal/webdav"
+	"overlink.top/app/system/logic"
 )
 
 var webdavHandler *webdav.Handler
