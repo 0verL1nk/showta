@@ -13,6 +13,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	go.uber.org/zap v1.26.0
 	gopkg.in/ini.v1 v1.67.0
+	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.30.0
 )
 
@@ -54,7 +55,6 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/mysql v1.6.0 // indirect
 	modernc.org/libc v1.22.5 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
 	modernc.org/memory v1.5.0 // indirect
